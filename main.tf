@@ -60,15 +60,46 @@ resource "google_compute_instance" "nginx_instance" {
   }
 }
 
-## WEB-INSTANCES: will create 3 web instances
-resource "google_compute_instance" "web-instances" {
-  count        = 3
-  name         = "web-${count.index}"
-  machine_type = var.environment_machine_type[var.target_environment]
-  labels       = {
-    environment = var.environment_map[var.target_environment]
+## Buckets
+
+resource "google_storage_bucket" "environment_buckets" {
+  for_each = toset(var.environment_list)
+  name     = "${lower(each.key)}_${var.project-id}"
+  location = "US"
+  versioning {
+    enabled = true
   }
+}
+
+## WEB-INSTANCES: will create 3 web instances
+# resource "google_compute_instance" "web-instances" {
+#   count        = 3
+#   name         = "web-${count.index}"
+#   machine_type = var.environment_machine_type[var.target_environment]
+#   labels       = {
+#     environment = var.environment_map[var.target_environment]
+#   }
   
+#   boot_disk {
+#     initialize_params {
+#       image = "debian-cloud/debian-11"
+#     }
+#   }
+
+#   network_interface {
+#     # A default network is created for all GCP projects
+#     network = data.google_compute_network.default.self_link
+#     subnetwork = google_compute_subnetwork.subnet-1.self_link
+#   }
+# }
+
+## WEB MAP INSTANCES: will create machines for all the environments - dev, qa, staging, production
+resource "google_compute_instance" "web-instances" {
+  for_each     = var.environment_instance_settings
+  name         = "${lower(each.key)}-web"
+  machine_type = each.value.machine_type
+  labels       =  each.value.labels
+
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-11"
@@ -76,11 +107,11 @@ resource "google_compute_instance" "web-instances" {
   }
 
   network_interface {
-    # A default network is created for all GCP projects
     network = data.google_compute_network.default.self_link
     subnetwork = google_compute_subnetwork.subnet-1.self_link
   }
 }
+
 
 ## DB
 resource "google_compute_instance" "mysqldb" {
